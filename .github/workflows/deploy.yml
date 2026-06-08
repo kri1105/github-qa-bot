@@ -1,0 +1,47 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write   # needed to push to GitHub Container Registry
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.backend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/backend:latest
+            ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+
+  deploy-backend:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Railway
+        run: |
+          curl -s -X POST "${{ secrets.RAILWAY_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{"image": "ghcr.io/${{ github.repository }}/backend:${{ github.sha }}"}'
+
+  # Vercel deploys automatically via its GitHub integration.
+  # No manual step needed — just connect the frontend/ directory in Vercel dashboard.

@@ -1,0 +1,27 @@
+[
+  {
+    "question": "How does the indexing pipeline work?",
+    "expected_file": "app/rag/indexer.py",
+    "keywords": ["chunk", "embed", "upsert", "chromadb"]
+  },
+  {
+    "question": "What embedding model is used?",
+    "expected_file": "app/rag/indexer.py",
+    "keywords": ["nomic-embed-text", "EMBED_MODEL"]
+  },
+  {
+    "question": "How are queries handled by the API?",
+    "expected_file": "app/main.py",
+    "keywords": ["/api/query", "QueryRequest", "ask"]
+  },
+  {
+    "question": "What LLM is used for generating answers?",
+    "expected_file": "app/rag/chain.py",
+    "keywords": ["LLM_MODEL", "mistral", "ollama"]
+  },
+  {
+    "question": "How is ChromaDB connected?",
+    "expected_file": "app/db/chroma_client.py",
+    "keywords": ["HttpClient", "CHROMA_HOST", "get_collection"]
+  }
+]
