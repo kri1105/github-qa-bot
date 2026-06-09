@@ -1,6 +1,6 @@
-# GitHub Repo Q&A Bot
+# 🤖 GitHub Repo Q&A Bot
 
-A local RAG (Retrieval-Augmented Generation) powered chatbot that lets you ask natural language questions about any codebase. Built with ChromaDB, Ollama, FastAPI, and Next.js — runs entirely on your machine, no API keys required.
+A local RAG (Retrieval-Augmented Generation) system that lets you ask natural language questions about any codebase. Built with ChromaDB + Ollama for fully offline inference, served by a FastAPI backend, and wrapped in a clean Next.js chat UI with source citations.
 
 ![Next.js](https://img.shields.io/badge/Next.js-15.3-black?logo=next.js)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi)
@@ -10,206 +10,187 @@ A local RAG (Retrieval-Augmented Generation) powered chatbot that lets you ask n
 
 ---
 
-## What it does
+## 📋 Table of Contents
+- [Overview](#-overview)
+- [Features](#-features)
+- [Architecture](#-architecture)
+- [Installation](#-installation)
+- [Usage](#-usage)
+- [Project Structure](#-project-structure)
+- [API Reference](#-api-reference)
+- [Roadmap](#-roadmap)
+- [License](#-license)
 
-Point it at a repo, ask questions, get answers with source citations.
+---
+
+## 🌟 Overview
+
+Reading through an unfamiliar codebase is slow. You spend more time `grep`-ing and scrolling than actually understanding. This project fixes that — index a repo once, then ask it anything in plain English.
+
+The full pipeline:
+
+1. **Index** — walk the repo, chunk files into 512-char overlapping segments, embed each chunk with `nomic-embed-text`, store in ChromaDB.
+2. **Retrieve** — embed the user's question, pull the top-5 most similar chunks via cosine similarity.
+3. **Generate** — feed those chunks as context to `mistral:7b`, which returns a grounded answer with file + line citations.
+
+Everything runs locally — no OpenAI key, no cloud, no cost.
+
+---
+
+## ✨ Features
+
+- **Fully offline** — `nomic-embed-text` for embeddings, `mistral:7b` for generation, both via Ollama.
+- **Source citations** — every answer links back to the exact file and line range it came from.
+- **Clean chat UI** — welcome screen with quick-prompt chips, animated loading dots, purple gradient bubbles.
+- **FastAPI backend** — `/api/query`, `/api/index`, `/healthz` with Pydantic validation.
+- **Docker-based infra** — ChromaDB and Ollama spin up with a single `docker-compose up`.
+- **Re-index on demand** — hit `/api/index` with any repo path to refresh the vector store.
+
+---
+
+## 🧠 Architecture
 
 ```
-"How does ChromaDB connect?"         → explains chroma_client.py with line references
-"What does the indexer do?"          → walks through the chunking + embedding pipeline
-"Where is the FastAPI query route?"  → finds and cites app/main.py
+┌──────────────┐    POST /api/query    ┌─────────────────────────────────┐
+│  Next.js UI  │ ────────────────────► │        FastAPI Backend          │
+│  (port 3000) │                       │  ┌───────────┐  ┌────────────┐  │
+└──────────────┘                       │  │ Retriever │─►│   Chain    │  │
+                                       │  └─────┬─────┘  └─────┬──────┘  │
+                                       └────────┼───────────────┼────────┘
+                                                ▼               ▼
+                                       ┌──────────────┐  ┌────────────┐
+                                       │   ChromaDB   │  │   Ollama   │
+                                       │ vector store │  │ mistral:7b │
+                                       │  (port 8000) │  │(port 11434)│
+                                       └──────────────┘  └────────────┘
+```
+
+**Indexing** (run once):
+```
+files → chunk (512 chars, 64 overlap) → embed (nomic-embed-text) → upsert ChromaDB
+```
+
+**Query** (every message):
+```
+question → embed → top-5 chunks → mistral:7b → answer + sources
 ```
 
 ---
 
-## Architecture
+## 🛠 Installation
 
-```
-┌─────────────┐     POST /api/query     ┌──────────────────────────────────┐
-│  Next.js UI │ ──────────────────────► │         FastAPI Backend          │
-│  (port 3000)│                         │  ┌──────────┐   ┌─────────────┐ │
-└─────────────┘                         │  │ Retriever│──►│    Chain    │ │
-                                        │  └────┬─────┘   └──────┬──────┘ │
-                                        │       │                 │        │
-                                        └───────┼─────────────────┼────────┘
-                                                ▼                 ▼
-                                        ┌──────────────┐  ┌─────────────┐
-                                        │   ChromaDB   │  │   Ollama    │
-                                        │ vector store │  │  LLM + emb  │
-                                        │  (port 8000) │  │ (port 11434)│
-                                        └──────────────┘  └─────────────┘
-```
-
-**Indexing pipeline** — run once per repo:
-`files → chunk (512 chars) → embed (nomic-embed-text) → upsert (ChromaDB)`
-
-**Query pipeline** — runs on every question:
-`question → embed → top-5 chunks → mistral:7b → answer + sources`
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Frontend | Next.js 15, React 19, TypeScript |
-| Backend | FastAPI, Python 3.11+ |
-| Vector DB | ChromaDB (HTTP, cosine similarity) |
-| LLM | Ollama — `mistral:7b` (generation) |
-| Embeddings | Ollama — `nomic-embed-text` |
-| Infra | Docker + docker-compose |
-
----
-
-## Prerequisites
-
+**Prerequisites**
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [Ollama](https://ollama.com/) installed locally
+- [Ollama](https://ollama.com/)
 - Node.js 18+
 - Python 3.11+
 
----
-
-## Getting Started
-
-### 1. Clone and enter the project
-
 ```bash
+# 1. Clone the repo
 git clone https://github.com/your-username/github-qa-bot.git
 cd github-qa-bot
-```
 
-### 2. Start ChromaDB and Ollama
-
-```bash
+# 2. Start ChromaDB + Ollama
 docker-compose up -d
-```
 
-### 3. Pull the required models
-
-```bash
+# 3. Pull models
 ollama pull mistral:7b
 ollama pull nomic-embed-text
-```
 
-### 4. Set up the backend
-
-```bash
+# 4. Backend setup
 cd backend
 python3 -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r requirements.txt
+
+# 5. Frontend setup
+cd ../frontend
+npm install
 ```
 
-### 5. Index a repo
+---
 
+## 🚀 Usage
+
+**Step 1 — Index a repo**
 ```bash
-# From the backend/ directory, with venv active
+# From backend/, with venv active
 python -m app.rag.indexer --repo /path/to/any/repo
 
-# Example: index this project itself
+# Index this project itself
 python -m app.rag.indexer --repo ..
 ```
 
-### 6. Start the backend
-
+**Step 2 — Start the backend**
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
-### 7. Start the frontend
-
+**Step 3 — Start the frontend**
 ```bash
-cd ../frontend
-npm install
-npm run dev
+cd frontend && npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) and start asking questions.
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 github-qa-bot/
-├── docker-compose.yml          # ChromaDB + Ollama services
+├── docker-compose.yml           # ChromaDB + Ollama services
 ├── backend/
 │   ├── requirements.txt
 │   └── app/
-│       ├── main.py             # FastAPI app — /healthz, /api/query, /api/index
+│       ├── main.py              # FastAPI — /healthz, /api/query, /api/index
 │       ├── db/
-│       │   └── chroma_client.py    # ChromaDB HTTP client + collection setup
+│       │   └── chroma_client.py # ChromaDB HTTP client + collection setup
 │       └── rag/
-│           ├── indexer.py      # File walker, chunker, embedder
-│           ├── retriever.py    # Query embedding + similarity search
-│           └── chain.py        # Context builder + Ollama LLM call
+│           ├── indexer.py       # File walker → chunker → embedder
+│           ├── retriever.py     # Query embed + cosine similarity search
+│           └── chain.py         # Context builder + Ollama LLM call
 └── frontend/
-    ├── next.config.js          # API proxy to backend
+    ├── next.config.js           # API proxy → backend
     └── src/
-        ├── app/
-        │   ├── page.tsx        # Root layout + header
-        │   └── globals.css
+        ├── app/page.tsx         # Root layout + header
         └── components/
-            ├── ChatBox.tsx         # Chat UI, message state, API calls
+            ├── ChatBox.tsx      # Chat UI, state, API calls
             └── SourceCitation.tsx  # Source badge renderer
 ```
 
 ---
 
-## API Reference
+## 🔌 API Reference
 
 ### `GET /healthz`
-Returns `{ "status": "ok" }`. Use to confirm the backend is alive.
+```json
+{ "status": "ok" }
+```
 
 ### `POST /api/query`
 ```json
+// Request
+{ "question": "How does the indexer chunk files?", "top_k": 5 }
+
+// Response
 {
-  "question": "How does the indexer chunk files?",
-  "top_k": 5
-}
-```
-Response:
-```json
-{
-  "answer": "The indexer splits files into 512-character chunks...",
+  "answer": "The indexer splits files into 512-character chunks with 64-char overlap...",
   "sources": [
-    { "file_path": "backend/app/rag/indexer.py", "start_line": 42, "end_line": 67, "distance": 0.12 }
+    { "file_path": "backend/app/rag/indexer.py", "start_line": 42, "end_line": 67 }
   ]
 }
 ```
 
 ### `POST /api/index`
-Trigger re-indexing. Requires `X-Api-Key: dev-secret` header.
+Requires `X-Api-Key: dev-secret` header.
 ```json
 { "repo_path": "/absolute/path/to/repo" }
 ```
 
 ---
 
-## Environment Variables
-
-Create a `.env` file in `backend/` to override defaults:
-
-```env
-CHROMA_HOST=localhost
-CHROMA_PORT=8000
-CHROMA_COLLECTION=repo_chunks
-OLLAMA_HOST=http://localhost:11434
-INDEX_API_KEY=dev-secret
-```
-
----
-
-## Supported File Types
-
-The indexer processes: `.py` `.js` `.ts` `.tsx` `.jsx` `.java` `.go` `.rs` `.cpp` `.c` `.h` `.md` `.txt` `.yaml` `.yml` `.json` `.toml` `.env`
-
-Skipped directories: `node_modules`, `.git`, `__pycache__`, `.next`, `venv`, `dist`, `build`
-
----
-
-## Roadmap
+## 🔮 Roadmap
 
 - [x] Local RAG pipeline (index + retrieve + generate)
 - [x] FastAPI backend with query and index endpoints
@@ -221,6 +202,21 @@ Skipped directories: `node_modules`, `.git`, `__pycache__`, `.next`, `venv`, `di
 
 ---
 
-## License
+## 📄 License
 
-MIT
+MIT — free for personal and commercial use.
+
+---
+
+## 🙏 Acknowledgments
+
+- [Ollama](https://ollama.com/) — for making local LLMs effortless.
+- [ChromaDB](https://www.trychroma.com/) — for the vector store.
+- [FastAPI](https://fastapi.tiangolo.com/) — for the clean Python API framework.
+- [Next.js](https://nextjs.org/) — for the frontend framework.
+
+> ⚠️ **Disclaimer:** This tool is for developer productivity only. Always review AI-generated answers against the actual source code before acting on them.
+
+---
+
+Built with ☕ and code.
