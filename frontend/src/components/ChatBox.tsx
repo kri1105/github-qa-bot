@@ -16,18 +16,13 @@ interface Message {
   loading?: boolean;
 }
 
-async function queryBackend(
-  question: string
-): Promise<{ answer: string; sources: Source[] }> {
+async function queryBackend(question: string) {
   const res = await fetch("/api/query", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question, top_k: 5 }),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `Request failed: ${res.status}`);
-  }
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
   return res.json();
 }
 
@@ -35,13 +30,13 @@ export default function ChatBox() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content:
-        "Hi! I have this repository indexed. Ask me anything about the code — architecture, specific functions, how features work, or where things are defined.",
+      content: "Hi! Ask me anything about this codebase — how things work, where code lives, or what a function does.",
     },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -67,80 +62,147 @@ export default function ChatBox() {
         { role: "assistant", content: answer, sources },
       ]);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Something went wrong.";
+      const msg = err instanceof Error ? err.message : "Something went wrong.";
       setMessages((prev) => [
         ...prev.slice(0, -1),
-        {
-          role: "assistant",
-          content: `Error: ${message}`,
-        },
+        { role: "assistant", content: `Error: ${msg}` },
       ]);
     } finally {
       setLoading(false);
+      inputRef.current?.focus();
     }
   }
 
+  const hasConversation = messages.length > 1 || (messages.length === 1 && messages[0].role === "user");
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Message list */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                msg.role === "user"
-                  ? "bg-blue-600 text-white rounded-br-sm"
-                  : "bg-white text-gray-800 border border-gray-200 rounded-bl-sm"
-              }`}
-            >
-              {msg.loading ? (
-                <div className="flex items-center gap-1.5 py-1">
-                  <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce [animation-delay:0ms]" />
-                  <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce [animation-delay:150ms]" />
-                  <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce [animation-delay:300ms]" />
-                </div>
-              ) : (
-                <>
-                  <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                  {msg.sources && msg.sources.length > 0 && (
-                    <SourceCitation sources={msg.sources} />
-                  )}
-                </>
-              )}
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", fontFamily: "system-ui, sans-serif" }}>
+      <style>{`
+        @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+      `}</style>
+
+      {/* Messages or Welcome screen */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "24px 16px", display: "flex", flexDirection: "column" }}>
+        {!hasConversation ? (
+          /* Welcome / empty state */
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 24, animation: "fadeIn 0.4s ease" }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: 18,
+              background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 30, boxShadow: "0 8px 24px rgba(99,102,241,0.3)"
+            }}>💬</div>
+            <div style={{ textAlign: "center" }}>
+              <h2 style={{ margin: "0 0 8px 0", fontSize: 22, fontWeight: 700, color: "#111827" }}>Ask about your codebase</h2>
+              <p style={{ margin: 0, fontSize: 15, color: "#6b7280", maxWidth: 380 }}>
+                Ask how things work, where code lives, or what a function does — powered by RAG over your indexed repo.
+              </p>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", maxWidth: 480 }}>
+              {["How does ChromaDB connect?", "What does the indexer do?", "Explain the RAG pipeline"].map((q) => (
+                <button
+                  key={q}
+                  onClick={() => { setInput(q); inputRef.current?.focus(); }}
+                  style={{
+                    padding: "8px 16px", borderRadius: 20, border: "1.5px solid #e0e7ff",
+                    background: "white", color: "#6366f1", fontSize: 13, fontWeight: 500,
+                    cursor: "pointer", transition: "all 0.15s",
+                  }}
+                  onMouseEnter={e => { (e.target as HTMLElement).style.background = "#f0f1ff"; }}
+                  onMouseLeave={e => { (e.target as HTMLElement).style.background = "white"; }}
+                >
+                  {q}
+                </button>
+              ))}
             </div>
           </div>
-        ))}
-        <div ref={bottomRef} />
+        ) : (
+          /* Chat messages */
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {messages.map((msg, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", alignItems: "flex-start", animation: "fadeIn 0.25s ease" }}>
+                {msg.role === "assistant" && (
+                  <div style={{
+                    width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: "white", fontSize: 13, fontWeight: 700, marginRight: 10, flexShrink: 0
+                  }}>AI</div>
+                )}
+                <div style={{
+                  maxWidth: "72%",
+                  background: msg.role === "user" ? "linear-gradient(135deg,#6366f1,#8b5cf6)" : "white",
+                  color: msg.role === "user" ? "white" : "#1f2937",
+                  borderRadius: msg.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                  padding: "12px 16px",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                  border: msg.role === "assistant" ? "1px solid #f3f4f6" : "none",
+                  fontSize: 15, lineHeight: 1.65,
+                }}>
+                  {msg.loading ? (
+                    <div style={{ display: "flex", gap: 5, padding: "2px 0", alignItems: "center" }}>
+                      {[0, 160, 320].map((delay) => (
+                        <div key={delay} style={{
+                          width: 7, height: 7, borderRadius: "50%", background: "#9ca3af",
+                          animation: "bounce 1.2s infinite", animationDelay: `${delay}ms`
+                        }} />
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{msg.content}</p>
+                      {msg.sources && <SourceCitation sources={msg.sources} />}
+                    </>
+                  )}
+                </div>
+                {msg.role === "user" && (
+                  <div style={{
+                    width: 34, height: 34, borderRadius: "50%", background: "#e0e7ff",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: "#6366f1", fontSize: 13, fontWeight: 700, marginLeft: 10, flexShrink: 0
+                  }}>U</div>
+                )}
+              </div>
+            ))}
+            <div ref={bottomRef} />
+          </div>
+        )}
       </div>
 
-      {/* Input area */}
-      <form
-        onSubmit={handleSubmit}
-        className="border-t border-gray-200 bg-white px-4 py-3 flex gap-2"
-      >
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask about the codebase..."
-          disabled={loading}
-          className="flex-1 rounded-xl border border-gray-300 px-4 py-2 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-blue-500
-                     disabled:opacity-50 disabled:cursor-not-allowed"
-        />
-        <button
-          type="submit"
-          disabled={loading || !input.trim()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium
-                     hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed
-                     transition-colors"
-        >
-          Ask
-        </button>
-      </form>
+      {/* Input bar */}
+      <div style={{ borderTop: "1px solid #f3f4f6", background: "white", padding: "14px 20px" }}>
+        <form onSubmit={handleSubmit} style={{ display: "flex", gap: 10 }}>
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask about the codebase..."
+            disabled={loading}
+            style={{
+              flex: 1, borderRadius: 28, border: "1.5px solid #e5e7eb",
+              padding: "13px 20px", fontSize: 15, outline: "none",
+              background: loading ? "#f9fafb" : "white", color: "#111827",
+              transition: "border-color 0.15s",
+            }}
+            onFocus={e => (e.target.style.borderColor = "#6366f1")}
+            onBlur={e => (e.target.style.borderColor = "#e5e7eb")}
+          />
+          <button
+            type="submit"
+            disabled={loading || !input.trim()}
+            style={{
+              borderRadius: 28, padding: "13px 26px",
+              background: loading || !input.trim() ? "#c7d2fe" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+              color: "white", border: "none", fontSize: 15, fontWeight: 600,
+              cursor: loading || !input.trim() ? "not-allowed" : "pointer",
+              whiteSpace: "nowrap", transition: "all 0.2s",
+            }}
+          >
+            {loading ? "Thinking…" : "Ask →"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

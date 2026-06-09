@@ -1,14 +1,10 @@
 version: "3.9"
 
-# Local development: all services in one command.
-# Usage: docker-compose up --build
-# Then open http://localhost:3000
-
 services:
   chromadb:
     image: chromadb/chroma:latest
     ports:
-      - "8001:8000"
+      - "8000:8000"
     volumes:
       - chroma_data:/chroma/chroma
     environment:
@@ -20,46 +16,6 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    # Pull models on first start
-    entrypoint: >
-      sh -c "ollama serve &
-             sleep 5 &&
-             ollama pull nomic-embed-text &&
-             ollama pull mistral:7b &&
-             wait"
-
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-    ports:
-      - "8080:8080"
-    depends_on:
-      - chromadb
-      - ollama
-    environment:
-      - CHROMA_HOST=chromadb
-      - CHROMA_PORT=8000
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - EMBED_MODEL=nomic-embed-text
-      - LLM_MODEL=mistral:7b
-      - REPO_PATH=/repo
-      - INDEX_API_KEY=dev-secret
-      - ALLOWED_ORIGINS=http://localhost:3000
-    volumes:
-      # Mount the repo you want to index at /repo
-      - .:/repo:ro
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.frontend
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
 
 volumes:
   chroma_data:

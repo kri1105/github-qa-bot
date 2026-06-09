@@ -1,10 +1,10 @@
 """
-FastAPI application — entry point.
+FastAPI application.
 
 Endpoints:
-    GET  /healthz          - liveness probe
-    POST /api/query        - ask a question about the repo
-    POST /api/index        - trigger re-indexing (protected by API key)
+    GET  /healthz       - check if server is running
+    POST /api/query     - ask a question, get answer + sources
+    POST /api/index     - trigger re-indexing (protected by API key)
 """
 import os
 from fastapi import FastAPI, HTTPException, Header
@@ -16,10 +16,9 @@ from app.rag.indexer import index_repo
 
 app = FastAPI(title="GitHub Repo Q&A Bot", version="1.0.0")
 
-# Allow Next.js dev server and production Vercel URL
 ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:3000,https://your-app.vercel.app",
+    "http://localhost:3000",
 ).split(",")
 
 app.add_middleware(
@@ -29,8 +28,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-INDEX_API_KEY = os.getenv("INDEX_API_KEY", "change-me-in-production")
-REPO_PATH = os.getenv("REPO_PATH", ".")
+INDEX_API_KEY = os.getenv("INDEX_API_KEY", "dev-secret")
+REPO_PATH     = os.getenv("REPO_PATH", "..")
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -39,15 +38,12 @@ class QueryRequest(BaseModel):
     question: str
     top_k: int = 5
 
-
 class QueryResponse(BaseModel):
     answer: str
     sources: list[dict]
 
-
 class IndexRequest(BaseModel):
     repo_path: str = REPO_PATH
-    clear: bool = False
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -60,7 +56,7 @@ def health():
 @app.post("/api/query", response_model=QueryResponse)
 def query(req: QueryRequest):
     if not req.question.strip():
-        raise HTTPException(status_code=400, detail="question must not be empty")
+        raise HTTPException(status_code=400, detail="Question must not be empty")
     try:
         result = ask(req.question, top_k=req.top_k)
     except Exception as e:
@@ -70,11 +66,10 @@ def query(req: QueryRequest):
 
 @app.post("/api/index")
 def trigger_index(req: IndexRequest, x_api_key: str = Header(default="")):
-    """Trigger re-indexing. Protected by X-Api-Key header."""
     if x_api_key != INDEX_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
     try:
-        total = index_repo(req.repo_path, clear=req.clear)
+        total = index_repo(req.repo_path)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"status": "ok", "chunks_indexed": total}

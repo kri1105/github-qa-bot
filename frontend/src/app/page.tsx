@@ -2,32 +2,27 @@ import ChatBox from "@/components/ChatBox";
 
 export default function Home() {
   return (
-    <main className="flex flex-col h-screen bg-gray-50">
+    <main style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#f8f9ff", fontFamily: "system-ui, sans-serif" }}>
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3 shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-          <svg
-            className="w-5 h-5 text-white"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-            />
-          </svg>
-        </div>
+      <header style={{
+        background: "white", borderBottom: "1px solid #f3f4f6",
+        padding: "16px 24px", flexShrink: 0,
+        display: "flex", alignItems: "center", gap: 12,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.06)"
+      }}>
+        <div style={{
+          width: 38, height: 38, borderRadius: 10,
+          background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 18,
+        }}>💬</div>
         <div>
-          <h1 className="text-base font-semibold text-gray-900">Repo Q&amp;A Bot</h1>
-          <p className="text-xs text-gray-500">Powered by Ollama + ChromaDB</p>
+          <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#111827" }}>GitHub Repo Q&amp;A</h1>
         </div>
       </header>
 
       {/* Chat area */}
-      <div className="flex-1 overflow-hidden max-w-3xl w-full mx-auto w-full">
+      <div style={{ flex: 1, overflow: "hidden", width: "100%", display: "flex", flexDirection: "column" }}>
         <ChatBox />
       </div>
     </main>

@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Allow the frontend to call the FastAPI backend (Railway URL in prod)
+  devIndicators: false,
   async rewrites() {
     return [
       {

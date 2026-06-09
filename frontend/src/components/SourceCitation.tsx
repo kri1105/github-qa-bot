@@ -4,48 +4,36 @@ interface Source {
   end_line: number;
 }
 
-interface SourceCitationProps {
-  sources: Source[];
-}
-
-export default function SourceCitation({ sources }: SourceCitationProps) {
+export default function SourceCitation({ sources }: { sources: Source[] }) {
   if (!sources || sources.length === 0) return null;
 
-  // Deduplicate by file_path
   const unique = sources.filter(
     (s, i, arr) => arr.findIndex((x) => x.file_path === s.file_path) === i
   );
 
   return (
-    <div className="mt-2 pt-2 border-t border-gray-200">
-      <p className="text-xs font-semibold text-gray-500 mb-1">Sources</p>
-      <div className="flex flex-wrap gap-2">
+    <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(0,0,0,0.08)" }}>
+      <p style={{ margin: "0 0 6px 0", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+        Sources
+      </p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {unique.map((s, i) => (
           <span
             key={i}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50
-                       text-blue-700 text-xs font-mono border border-blue-200"
             title={`Lines ${s.start_line}–${s.end_line}`}
+            style={{
+              display: "inline-block",
+              padding: "3px 10px",
+              borderRadius: 20,
+              background: "rgba(99,102,241,0.1)",
+              color: "#6366f1",
+              fontSize: 12,
+              fontFamily: "monospace",
+              border: "1px solid rgba(99,102,241,0.2)",
+              whiteSpace: "nowrap",
+            }}
           >
-            <svg
-              className="w-3 h-3 shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586
-                   a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19
-                   a2 2 0 01-2 2z"
-              />
-            </svg>
-            {s.file_path}
-            <span className="text-blue-400">
-              :{s.start_line}–{s.end_line}
-            </span>
+            📄 {s.file_path}:{s.start_line}–{s.end_line}
           </span>
         ))}
       </div>
