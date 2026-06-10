@@ -9,30 +9,21 @@ EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 TOP_K       = int(os.getenv("RETRIEVAL_TOP_K", "5"))
 
 
-def retrieve(query: str, top_k: int = TOP_K) -> list[dict]:
+def retrieve(query: str, top_k: int = TOP_K, collection_name: str = None) -> list[dict]:
     """
-    Embed the query and return top-k most relevant chunks.
-
-    Each result has:
-        text       - the raw chunk text
-        file_path  - relative path in the repo
-        start_line - first line of the chunk
-        end_line   - last line of the chunk
-        distance   - cosine distance (lower = more similar)
+    Embed the query and return top-k most relevant chunks from the given collection.
+    collection_name=None uses the default collection (original behaviour).
     """
-    # Step 1: embed the question
     response        = ollama.embed(model=EMBED_MODEL, input=[query])
     query_embedding = response["embeddings"][0]
 
-    # Step 2: search ChromaDB
-    collection = get_collection()
+    collection = get_collection(name=collection_name)
     results    = collection.query(
         query_embeddings=[query_embedding],
         n_results=top_k,
         include=["documents", "metadatas", "distances"],
     )
 
-    # Step 3: format and return
     chunks = []
     for doc, meta, dist in zip(
         results["documents"][0],

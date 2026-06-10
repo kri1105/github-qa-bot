@@ -16,23 +16,18 @@ interface Message {
   loading?: boolean;
 }
 
-async function queryBackend(question: string) {
+async function queryBackend(question: string, repo: string | null) {
   const res = await fetch("/api/query", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, top_k: 5 }),
+    body: JSON.stringify({ question, top_k: 5, repo }),
   });
   if (!res.ok) throw new Error(`Request failed: ${res.status}`);
   return res.json();
 }
 
-export default function ChatBox() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: "Hi! Ask me anything about this codebase — how things work, where code lives, or what a function does.",
-    },
-  ]);
+export default function ChatBox({ activeRepo }: { activeRepo: string | null }) {
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -56,7 +51,7 @@ export default function ChatBox() {
     setLoading(true);
 
     try {
-      const { answer, sources } = await queryBackend(question);
+      const { answer, sources } = await queryBackend(question, activeRepo);
       setMessages((prev) => [
         ...prev.slice(0, -1),
         { role: "assistant", content: answer, sources },
@@ -73,7 +68,7 @@ export default function ChatBox() {
     }
   }
 
-  const hasConversation = messages.length > 1 || (messages.length === 1 && messages[0].role === "user");
+  const hasConversation = messages.length > 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", fontFamily: "system-ui, sans-serif" }}>
@@ -82,10 +77,8 @@ export default function ChatBox() {
         @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
       `}</style>
 
-      {/* Messages or Welcome screen */}
       <div style={{ flex: 1, overflowY: "auto", padding: "24px 16px", display: "flex", flexDirection: "column" }}>
         {!hasConversation ? (
-          /* Welcome / empty state */
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 24, animation: "fadeIn 0.4s ease" }}>
             <div style={{
               width: 64, height: 64, borderRadius: 18,
@@ -96,7 +89,9 @@ export default function ChatBox() {
             <div style={{ textAlign: "center" }}>
               <h2 style={{ margin: "0 0 8px 0", fontSize: 22, fontWeight: 700, color: "#111827" }}>Ask about your codebase</h2>
               <p style={{ margin: 0, fontSize: 15, color: "#6b7280", maxWidth: 380 }}>
-                Ask how things work, where code lives, or what a function does — powered by RAG over your indexed repo.
+                {activeRepo
+                  ? <>Asking about <span style={{ fontWeight: 600, color: "#6366f1" }}>{activeRepo.replace(/_/g, "/")}</span></>
+                  : "Load a repo above, or ask about the default indexed codebase."}
               </p>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", maxWidth: 480 }}>
@@ -107,7 +102,7 @@ export default function ChatBox() {
                   style={{
                     padding: "8px 16px", borderRadius: 20, border: "1.5px solid #e0e7ff",
                     background: "white", color: "#6366f1", fontSize: 13, fontWeight: 500,
-                    cursor: "pointer", transition: "all 0.15s",
+                    cursor: "pointer",
                   }}
                   onMouseEnter={e => { (e.target as HTMLElement).style.background = "#f0f1ff"; }}
                   onMouseLeave={e => { (e.target as HTMLElement).style.background = "white"; }}
@@ -118,7 +113,6 @@ export default function ChatBox() {
             </div>
           </div>
         ) : (
-          /* Chat messages */
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {messages.map((msg, i) => (
               <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", alignItems: "flex-start", animation: "fadeIn 0.25s ease" }}>
@@ -183,7 +177,6 @@ export default function ChatBox() {
               flex: 1, borderRadius: 28, border: "1.5px solid #e5e7eb",
               padding: "13px 20px", fontSize: 15, outline: "none",
               background: loading ? "#f9fafb" : "white", color: "#111827",
-              transition: "border-color 0.15s",
             }}
             onFocus={e => (e.target.style.borderColor = "#6366f1")}
             onBlur={e => (e.target.style.borderColor = "#e5e7eb")}
@@ -196,7 +189,7 @@ export default function ChatBox() {
               background: loading || !input.trim() ? "#c7d2fe" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
               color: "white", border: "none", fontSize: 15, fontWeight: 600,
               cursor: loading || !input.trim() ? "not-allowed" : "pointer",
-              whiteSpace: "nowrap", transition: "all 0.2s",
+              whiteSpace: "nowrap",
             }}
           >
             {loading ? "Thinking…" : "Ask →"}

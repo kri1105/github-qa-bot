@@ -1,6 +1,12 @@
+"use client";
+
+import { useState } from "react";
 import ChatBox from "@/components/ChatBox";
+import RepoLoader from "@/components/RepoLoader";
 
 export default function Home() {
+  const [activeRepo, setActiveRepo] = useState<string | null>(null);
+
   return (
     <main style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#f8f9ff", fontFamily: "system-ui, sans-serif" }}>
       {/* Header */}
@@ -16,14 +22,15 @@ export default function Home() {
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 18,
         }}>💬</div>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#111827" }}>GitHub Repo Q&amp;A</h1>
-        </div>
+        <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#111827" }}>GitHub Repo Q&amp;A</h1>
       </header>
+
+      {/* Repo loader bar */}
+      <RepoLoader activeRepo={activeRepo} onRepoChange={setActiveRepo} />
 
       {/* Chat area */}
       <div style={{ flex: 1, overflow: "hidden", width: "100%", display: "flex", flexDirection: "column" }}>
-        <ChatBox />
+        <ChatBox activeRepo={activeRepo} />
       </div>
     </main>
   );

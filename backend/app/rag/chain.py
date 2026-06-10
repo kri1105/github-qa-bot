@@ -16,7 +16,6 @@ Be concise and technical.
 
 
 def _build_context(chunks: list[dict]) -> str:
-    """Format chunks into a readable context block."""
     parts = []
     for i, chunk in enumerate(chunks, 1):
         header = f"[{i}] {chunk['file_path']} (lines {chunk['start_line']}-{chunk['end_line']})"
@@ -24,24 +23,16 @@ def _build_context(chunks: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
-def ask(question: str, top_k: int = 5) -> dict:
+def ask(question: str, top_k: int = 5, collection_name: str = None) -> dict:
     """
     Full RAG pipeline: retrieve → build prompt → generate answer.
-
-    Returns:
-        {
-            "answer": str,
-            "sources": [{"file_path": ..., "start_line": ..., "end_line": ...}]
-        }
+    collection_name scopes the query to a specific repo's collection.
     """
-    # Step 1: retrieve relevant chunks
-    chunks  = retrieve(question, top_k=top_k)
+    chunks  = retrieve(question, top_k=top_k, collection_name=collection_name)
     context = _build_context(chunks)
 
-    # Step 2: build the prompt
     user_message = f"Context:\n{context}\n\nQuestion: {question}\nAnswer:"
 
-    # Step 3: call Ollama LLM
     response = ollama.chat(
         model=LLM_MODEL,
         messages=[
@@ -52,11 +43,7 @@ def ask(question: str, top_k: int = 5) -> dict:
 
     answer  = response["message"]["content"].strip()
     sources = [
-        {
-            "file_path":  c["file_path"],
-            "start_line": c["start_line"],
-            "end_line":   c["end_line"],
-        }
+        {"file_path": c["file_path"], "start_line": c["start_line"], "end_line": c["end_line"]}
         for c in chunks
     ]
 
