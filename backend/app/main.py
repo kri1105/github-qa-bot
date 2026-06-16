@@ -2,20 +2,22 @@
 FastAPI application.
 
 Endpoints:
-    GET  /healthz            - liveness check
-    GET  /api/repos          - list all indexed repos
-    GET  /api/index/status   - status of ongoing/completed index jobs
-    POST /api/query          - ask a question against a specific repo
-    POST /api/index          - async index a local path or GitHub URL
+    GET  /healthz              - liveness check
+    GET  /api/repos            - list all indexed repos
+    GET  /api/index/status     - status of ongoing/completed index jobs
+    POST /api/query            - ask a question (blocking, returns full answer)
+    POST /api/query/stream     - ask a question (streaming SSE tokens)
+    POST /api/index            - async index a local path or GitHub URL
 """
 import os
 import uuid
 from fastapi import FastAPI, HTTPException, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 
-from app.rag.chain import ask
+from app.rag.chain import ask, ask_stream
 from app.rag.indexer import index_repo, index_repo_from_url
 from app.db.chroma_client import list_collections, collection_name_from_url, get_collection, get_client
 
@@ -89,10 +91,10 @@ def index_status():
 
 @app.post("/api/query", response_model=QueryResponse)
 def query(req: QueryRequest):
+    """Blocking query — kept for API clients / curl testing."""
     if not req.question.strip():
         raise HTTPException(status_code=400, detail="Question must not be empty")
     try:
-        # Check the collection exists and has data before querying
         if req.repo:
             existing = list_collections()
             if req.repo not in existing:
@@ -103,6 +105,30 @@ def query(req: QueryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return result
+
+
+@app.post("/api/query/stream")
+def query_stream(req: QueryRequest):
+    """
+    Streaming query — returns SSE events as tokens are generated.
+    The frontend consumes this with a ReadableStream reader.
+    """
+    if not req.question.strip():
+        raise HTTPException(status_code=400, detail="Question must not be empty")
+
+    if req.repo:
+        existing = list_collections()
+        if req.repo not in existing:
+            raise HTTPException(status_code=404, detail=f"Repo '{req.repo}' not indexed yet.")
+
+    return StreamingResponse(
+        ask_stream(req.question, top_k=req.top_k, collection_name=req.repo),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",   # disable nginx buffering if proxied
+        },
+    )
 
 
 @app.post("/api/index")
@@ -119,7 +145,6 @@ def trigger_index(
     job_id = str(uuid.uuid4())[:8]
     _jobs[job_id] = {"status": "indexing", "collection": None}
 
-    # Derive collection name upfront so the frontend knows what to expect
     col_name = collection_name_from_url(req.repo_url or req.repo_path)
     _jobs[job_id]["collection"] = col_name
 
