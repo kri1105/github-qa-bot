@@ -1,6 +1,6 @@
 "use client";
 
-type View = "repositories" | "chat" | "history";
+export type View = "repositories" | "chat" | "history" | "settings" | "support";
 
 interface SidebarProps {
   view: View;
@@ -66,17 +66,17 @@ export default function Sidebar({ view, onViewChange, onNewAnalysis, projectName
         </button>
       </div>
 
-      {/* Nav */}
+      {/* Main Nav */}
       <nav style={{ flex: 1, padding: "4px 8px", display: "flex", flexDirection: "column", gap: 2 }}>
         <NavItem icon="💬" label="Current Chat"   active={view === "chat"}         onClick={() => onViewChange("chat")} />
         <NavItem icon="🕐" label="History"        active={view === "history"}      onClick={() => onViewChange("history")} />
         <NavItem icon="📦" label="Repositories"   active={view === "repositories"} onClick={() => onViewChange("repositories")} />
       </nav>
 
-      {/* Bottom */}
+      {/* Bottom Nav */}
       <div style={{ padding: "8px", borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 2 }}>
-        <NavItem icon="⚙️" label="Settings" onClick={() => {}} />
-        <NavItem icon="❓" label="Support"  onClick={() => {}} />
+        <NavItem icon="⚙️" label="Settings" active={view === "settings"} onClick={() => onViewChange("settings")} />
+        <NavItem icon="❓" label="Support"  active={view === "support"}  onClick={() => onViewChange("support")} />
       </div>
     </aside>
   );

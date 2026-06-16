@@ -10,8 +10,8 @@ export async function POST(req: NextRequest) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      // 2-minute timeout for slow models
-      signal: AbortSignal.timeout(120_000),
+      // 10-minute timeout — large local models (8b+) can be slow on CPU
+      signal: AbortSignal.timeout(600_000),
     });
 
     if (!res.ok) {

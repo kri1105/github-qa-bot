@@ -1,14 +1,26 @@
 import os
 import re
+from urllib.parse import urlparse
 import chromadb
 
-CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
-CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
+_CHROMA_URL  = os.getenv("CHROMA_HOST", "http://localhost:8000")
 DEFAULT_COLLECTION = os.getenv("CHROMA_COLLECTION", "repo_chunks")
 
 
+def _parse_chroma_url(url: str) -> tuple[str, int, bool]:
+    """Return (host, port, ssl) from a bare hostname or full URL."""
+    if "://" not in url:
+        url = f"http://{url}"
+    parsed = urlparse(url)
+    host   = parsed.hostname or "localhost"
+    port   = parsed.port or (443 if parsed.scheme == "https" else 8000)
+    ssl    = parsed.scheme == "https"
+    return host, port, ssl
+
+
 def get_client() -> chromadb.HttpClient:
-    return chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
+    host, port, ssl = _parse_chroma_url(_CHROMA_URL)
+    return chromadb.HttpClient(host=host, port=port, ssl=ssl)
 
 
 def collection_name_from_url(url: str) -> str:

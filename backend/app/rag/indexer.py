@@ -15,7 +15,7 @@ import tempfile
 from pathlib import Path
 from typing import Iterator
 
-import ollama
+from app.rag.embedder import embed as get_embeddings
 from app.db.chroma_client import get_collection, collection_name_from_url, delete_collection
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -196,8 +196,7 @@ def _inject_metadata_chunk(collection, url: str) -> None:
         f"Full name: {owner}/{repo_name}\n"
         f"GitHub URL: {clean}\n"
     )
-    response  = ollama.embed(model=EMBED_MODEL, input=[doc])
-    embedding = response["embeddings"][0]
+    embedding = get_embeddings([doc])[0]
     collection.upsert(
         ids=["__repo_metadata__"],
         documents=[doc],
@@ -225,8 +224,7 @@ def index_repo(repo_path: str, collection_name: str = None) -> int:
     def flush():
         if not batch_docs:
             return
-        response   = ollama.embed(model=EMBED_MODEL, input=batch_docs)
-        embeddings = response["embeddings"]
+        embeddings = get_embeddings(batch_docs)
         collection.upsert(
             ids=batch_ids, documents=batch_docs,
             metadatas=batch_metas, embeddings=embeddings,
