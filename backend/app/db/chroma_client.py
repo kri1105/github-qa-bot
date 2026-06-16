@@ -38,6 +38,16 @@ def get_collection(client: chromadb.HttpClient = None, name: str = None):
     )
 
 
+def delete_collection(name: str, client: chromadb.HttpClient = None) -> bool:
+    """Delete a collection by name. Returns True if deleted, False if it didn't exist."""
+    client = client or get_client()
+    try:
+        client.delete_collection(name)
+        return True
+    except Exception:
+        return False
+
+
 def list_collections(client: chromadb.HttpClient = None) -> list[str]:
     """Returns names of all collections that exist in ChromaDB."""
     client = client or get_client()

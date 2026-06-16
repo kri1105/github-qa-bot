@@ -19,7 +19,7 @@ from typing import Optional
 
 from app.rag.chain import ask, ask_stream
 from app.rag.indexer import index_repo, index_repo_from_url
-from app.db.chroma_client import list_collections, collection_name_from_url, get_collection, get_client
+from app.db.chroma_client import list_collections, collection_name_from_url, get_collection, get_client, delete_collection
 
 app = FastAPI(title="GitHub Repo Q&A Bot", version="2.0.0")
 
@@ -129,6 +129,17 @@ def query_stream(req: QueryRequest):
             "X-Accel-Buffering": "no",   # disable nginx buffering if proxied
         },
     )
+
+
+@app.delete("/api/repos/{collection_name}")
+def delete_repo(collection_name: str, x_api_key: str = Header(default="")):
+    """Delete a repo's indexed data from ChromaDB."""
+    if x_api_key != INDEX_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    deleted = delete_collection(collection_name)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Collection '{collection_name}' not found")
+    return {"status": "deleted", "collection": collection_name}
 
 
 @app.post("/api/index")

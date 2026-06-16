@@ -1,20 +1,29 @@
 """
 Chain: retrieved chunks → prompt → Ollama LLM → answer + sources.
+
+Two modes:
+  - Code mode:    relevant chunks found → answer from codebase context
+  - General mode: no relevant chunks   → answer from LLM general knowledge
 """
 import os
 import json
 import ollama
 from app.rag.retriever import retrieve
 
-# llama3.2:3b is ~3x faster than mistral:7b for RAG tasks.
-# Override with LLM_MODEL env var if needed.
 LLM_MODEL = os.getenv("LLM_MODEL", "llama3.2:3b")
 
-SYSTEM_PROMPT = """\
-You are a code assistant. Answer the question using ONLY the provided context.
-If the answer is not in the context, say "I don't know based on the indexed code."
-Always cite the exact file path for every claim you make.
-Be concise and technical.
+CODE_SYSTEM_PROMPT = """\
+You are an expert code assistant helping a developer understand a GitHub repository.
+Answer the question using the provided code context. Be concise and technical.
+Always mention the file path when referencing specific code.
+If the context doesn't contain enough information, say so clearly but still try to help based on what is available.
+"""
+
+GENERAL_SYSTEM_PROMPT = """\
+You are a helpful AI assistant — knowledgeable, concise, and friendly.
+Answer the user's question using your general knowledge.
+If the question is about a specific codebase, let the user know you don't have indexed context for it
+and suggest they load the repo using the "+ Load Repo" button.
 """
 
 
@@ -27,54 +36,57 @@ def _build_context(chunks: list[dict]) -> str:
 
 
 def ask(question: str, top_k: int = 5, collection_name: str = None) -> dict:
-    """Blocking RAG pipeline (kept for backward compat / tests)."""
-    chunks  = retrieve(question, top_k=top_k, collection_name=collection_name)
-    context = _build_context(chunks)
+    """Blocking RAG pipeline."""
+    chunks = retrieve(question, top_k=top_k, collection_name=collection_name)
 
-    user_message = f"Context:\n{context}\n\nQuestion: {question}\nAnswer:"
+    if chunks:
+        context      = _build_context(chunks)
+        user_message = f"Code context:\n{context}\n\nQuestion: {question}\nAnswer:"
+        system       = CODE_SYSTEM_PROMPT
+    else:
+        user_message = question
+        system       = GENERAL_SYSTEM_PROMPT
 
     response = ollama.chat(
         model=LLM_MODEL,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system},
             {"role": "user",   "content": user_message},
         ],
     )
 
-    answer  = response["message"]["content"].strip()
     sources = [
         {"file_path": c["file_path"], "start_line": c["start_line"], "end_line": c["end_line"]}
         for c in chunks
     ]
-    return {"answer": answer, "sources": sources}
+    return {"answer": response["message"]["content"].strip(), "sources": sources}
 
 
 def ask_stream(question: str, top_k: int = 5, collection_name: str = None):
     """
-    Streaming RAG pipeline. Yields Server-Sent Event strings.
-
-    Event types:
-      {"type": "sources", "sources": [...]}   — sent first
-      {"type": "token",   "token": "..."}     — one per LLM token
-      {"type": "done"}                        — final sentinel
+    Streaming RAG pipeline. Yields SSE strings.
+    Falls back to general knowledge when no relevant code chunks are found.
     """
-    chunks  = retrieve(question, top_k=top_k, collection_name=collection_name)
-    context = _build_context(chunks)
+    chunks = retrieve(question, top_k=top_k, collection_name=collection_name)
 
     sources = [
         {"file_path": c["file_path"], "start_line": c["start_line"], "end_line": c["end_line"]}
         for c in chunks
     ]
-
-    # Send sources immediately so the frontend can display them
     yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
 
-    user_message = f"Context:\n{context}\n\nQuestion: {question}\nAnswer:"
+    if chunks:
+        context      = _build_context(chunks)
+        user_message = f"Code context:\n{context}\n\nQuestion: {question}\nAnswer:"
+        system       = CODE_SYSTEM_PROMPT
+    else:
+        user_message = question
+        system       = GENERAL_SYSTEM_PROMPT
 
     stream = ollama.chat(
         model=LLM_MODEL,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system},
             {"role": "user",   "content": user_message},
         ],
         stream=True,
