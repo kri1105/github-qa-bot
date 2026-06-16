@@ -95,7 +95,59 @@ def _read_file(filepath: Path) -> str:
     return filepath.read_text(encoding="utf-8", errors="ignore")
 
 
+def _split_on_boundaries(text: str, size: int) -> list[tuple[int, int]] | None:
+    """
+    Try to split at natural code boundaries (blank line before def/class/function).
+    Returns list of (start_char, end_char) pairs, or None if text fits in one chunk.
+    """
+    import re
+    if len(text) <= size:
+        return None
+
+    # Boundaries: lines that start a new top-level definition or section
+    boundary_re = re.compile(
+        r"^(?:def |class |async def |function |const |export |module |impl |fn |pub fn |#+ )",
+        re.MULTILINE,
+    )
+
+    boundaries = [0] + [m.start() for m in boundary_re.finditer(text)] + [len(text)]
+    segments: list[tuple[int, int]] = []
+    start = 0
+
+    for i in range(1, len(boundaries)):
+        seg_end = boundaries[i]
+        seg_len = seg_end - start
+        if seg_len >= size:
+            # Segment too big — fall back to character splits within it
+            pos = start
+            while pos < seg_end:
+                end = min(pos + size, seg_end)
+                segments.append((pos, end))
+                if end == seg_end:
+                    break
+                pos += size - CHUNK_OVERLAP
+            start = seg_end
+        elif i == len(boundaries) - 1 or (seg_end - start) + (boundaries[i + 1] - seg_end) > size:
+            # Flush current accumulation
+            segments.append((start, seg_end))
+            start = seg_end
+
+    if start < len(text):
+        segments.append((start, len(text)))
+
+    return segments if len(segments) > 1 else None
+
+
 def _split_text(text: str, size: int, overlap: int) -> list[dict]:
+    # Try semantic boundary splitting first
+    boundary_splits = _split_on_boundaries(text, size)
+    if boundary_splits:
+        return [
+            {"text": text[s:e], "start_char": s, "end_char": e}
+            for s, e in boundary_splits
+        ]
+
+    # Fall back to sliding window character splits
     chunks, start = [], 0
     while start < len(text):
         end = min(start + size, len(text))

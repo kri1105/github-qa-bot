@@ -10,20 +10,31 @@ import json
 import ollama
 from app.rag.retriever import retrieve
 
-LLM_MODEL = os.getenv("LLM_MODEL", "llama3.2:3b")
+LLM_MODEL = os.getenv("LLM_MODEL", "llama3.1:8b")
 
 CODE_SYSTEM_PROMPT = """\
-You are an expert code assistant helping a developer understand a GitHub repository.
-Answer the question using the provided code context. Be concise and technical.
-Always mention the file path when referencing specific code.
-If the context doesn't contain enough information, say so clearly but still try to help based on what is available.
+You are an expert software engineer helping a developer understand a GitHub repository.
+You have been given relevant code snippets retrieved from the codebase.
+
+Guidelines:
+- Answer directly and technically. Avoid filler phrases like "Based on the context...".
+- Always cite the exact file path (e.g. `src/utils/helper.py`) when referencing code.
+- If the answer involves code, show a concise example using markdown code blocks with the correct language tag.
+- Structure longer answers with clear sections: use bold headings like **How it works**, **Key files**, **Example**.
+- If multiple files are involved, explain how they interact.
+- If the context is incomplete, say what you can determine and what is unclear.
+- Never make up function names, class names, or file paths that are not in the provided context.
 """
 
 GENERAL_SYSTEM_PROMPT = """\
-You are a helpful AI assistant — knowledgeable, concise, and friendly.
+You are a helpful, expert software engineering assistant — knowledgeable, concise, and direct.
 Answer the user's question using your general knowledge.
-If the question is about a specific codebase, let the user know you don't have indexed context for it
-and suggest they load the repo using the "+ Load Repo" button.
+
+Guidelines:
+- Be direct. Do not pad your answer with unnecessary preamble.
+- Use markdown code blocks with language tags for any code examples.
+- If the question is about a specific codebase that hasn't been indexed, briefly mention they can paste the GitHub URL in the chat to auto-index it.
+- For architecture or design questions, use bullet points or numbered steps for clarity.
 """
 
 
@@ -41,7 +52,7 @@ def ask(question: str, top_k: int = 5, collection_name: str = None) -> dict:
 
     if chunks:
         context      = _build_context(chunks)
-        user_message = f"Code context:\n{context}\n\nQuestion: {question}\nAnswer:"
+        user_message = f"Here are the relevant code snippets from the repository:\n\n{context}\n\nQuestion: {question}"
         system       = CODE_SYSTEM_PROMPT
     else:
         user_message = question
@@ -77,7 +88,7 @@ def ask_stream(question: str, top_k: int = 5, collection_name: str = None):
 
     if chunks:
         context      = _build_context(chunks)
-        user_message = f"Code context:\n{context}\n\nQuestion: {question}\nAnswer:"
+        user_message = f"Here are the relevant code snippets from the repository:\n\n{context}\n\nQuestion: {question}"
         system       = CODE_SYSTEM_PROMPT
     else:
         user_message = question

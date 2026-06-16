@@ -1,37 +1,57 @@
 "use client";
 
 import { useState } from "react";
-import ChatBox from "@/components/ChatBox";
-import RepoLoader from "@/components/RepoLoader";
+import Sidebar       from "@/components/Sidebar";
+import RepoHome      from "@/components/RepoHome";
+import FileTree      from "@/components/FileTree";
+import ChatInterface from "@/components/ChatInterface";
+
+type View = "repositories" | "chat" | "history";
 
 export default function Home() {
+  const [view, setView]             = useState<View>("repositories");
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
+  const [activeFile, setActiveFile] = useState<string | null>(null);
+
+  function selectRepo(col: string) {
+    setActiveRepo(col);
+    setActiveFile(null);
+    setView("chat");
+  }
+
+  function newAnalysis() {
+    setActiveRepo(null);
+    setActiveFile(null);
+    setView("repositories");
+  }
 
   return (
-    <main style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#f8f9ff", fontFamily: "system-ui, sans-serif" }}>
-      {/* Header */}
-      <header style={{
-        background: "white", borderBottom: "1px solid #f3f4f6",
-        padding: "16px 24px", flexShrink: 0,
-        display: "flex", alignItems: "center", gap: 12,
-        boxShadow: "0 1px 4px rgba(0,0,0,0.06)"
-      }}>
-        <div style={{
-          width: 38, height: 38, borderRadius: 10,
-          background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 18,
-        }}>💬</div>
-        <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#111827" }}>GitHub Repo Q&amp;A</h1>
-      </header>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--bg-base)" }}>
+      <Sidebar
+        view={view}
+        onViewChange={setView}
+        onNewAnalysis={newAnalysis}
+        projectName={activeRepo ? activeRepo.replace(/_/g, "/").split("/").pop() : undefined}
+      />
 
-      {/* Repo loader bar */}
-      <RepoLoader activeRepo={activeRepo} onRepoChange={setActiveRepo} />
-
-      {/* Chat area */}
-      <div style={{ flex: 1, overflow: "hidden", width: "100%", display: "flex", flexDirection: "column" }}>
-        <ChatBox activeRepo={activeRepo} />
-      </div>
-    </main>
+      {view === "repositories" || !activeRepo ? (
+        /* ── Landing / repo picker ── */
+        <RepoHome onRepoSelect={selectRepo} />
+      ) : (
+        /* ── Analysis view: FileTree + Chat ── */
+        <div style={{ flex: 1, display: "flex", height: "100%", overflow: "hidden" }}>
+          <FileTree
+            collection={activeRepo}
+            activeFile={activeFile}
+            onFileClick={setActiveFile}
+          />
+          <ChatInterface
+            activeRepo={activeRepo}
+            activeFile={activeFile}
+            onRepoChange={col => { setActiveRepo(col); setActiveFile(null); }}
+          />
+        </div>
+      )}
+    </div>
   );
 }

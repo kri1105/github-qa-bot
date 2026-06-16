@@ -11,6 +11,8 @@ Endpoints:
 """
 import os
 import uuid
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 from fastapi import FastAPI, HTTPException, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -72,6 +74,21 @@ def _run_index(job_id: str, repo_url: str | None, repo_path: str | None):
 @app.get("/healthz")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/files/{collection_name}")
+def get_files(collection_name: str):
+    """Return all unique file paths indexed in a collection (for the file tree)."""
+    try:
+        col     = get_collection(name=collection_name)
+        results = col.get(include=["metadatas"])
+        files   = sorted(set(
+            m["file_path"] for m in results["metadatas"]
+            if m.get("file_path") and m["file_path"] not in ("REPO_METADATA", "unknown")
+        ))
+        return {"files": files}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/repos")

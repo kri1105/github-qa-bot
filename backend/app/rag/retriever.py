@@ -6,7 +6,7 @@ import ollama
 from app.db.chroma_client import get_collection
 
 EMBED_MODEL        = os.getenv("EMBED_MODEL", "nomic-embed-text")
-TOP_K              = int(os.getenv("RETRIEVAL_TOP_K", "5"))
+TOP_K              = int(os.getenv("RETRIEVAL_TOP_K", "8"))
 DISTANCE_THRESHOLD = float(os.getenv("DISTANCE_THRESHOLD", "0.85"))
 
 
