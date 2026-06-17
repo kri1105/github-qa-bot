@@ -129,8 +129,29 @@ interface ChatInterfaceProps {
 export default function ChatInterface({ activeRepo, activeFile, onRepoChange, messages, setMessages }: ChatInterfaceProps) {
   const [input, setInput]     = useState("");
   const [loading, setLoading] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
   const bottomRef             = useRef<HTMLDivElement>(null);
   const inputRef              = useRef<HTMLInputElement>(null);
+  const navRef                = useRef<HTMLDivElement>(null);
+
+  // Close nav popup when clicking outside
+  useEffect(() => {
+    if (!navOpen) return;
+    function onClickOutside(e: MouseEvent) {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) setNavOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [navOpen]);
+
+  function scrollToMessage(index: number) {
+    document.getElementById(`msg-${index}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setNavOpen(false);
+  }
+
+  const userMessages = messages
+    .map((m, i) => ({ index: i, content: m.content }))
+    .filter(m => messages[m.index].role === "user");
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -224,7 +245,7 @@ export default function ChatInterface({ activeRepo, activeFile, onRepoChange, me
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             {messages.map((msg, i) => (
-              <div key={i} style={{ display: "flex", gap: 12, justifyContent: msg.role === "user" ? "flex-end" : "flex-start", animation: "fadeUp 0.2s ease" }}>
+              <div key={i} id={`msg-${i}`} style={{ display: "flex", gap: 12, justifyContent: msg.role === "user" ? "flex-end" : "flex-start", animation: "fadeUp 0.2s ease" }}>
                 {msg.role === "assistant" && (
                   <div style={{ width: 32, height: 32, borderRadius: "50%", flexShrink: 0, background: "var(--accent-dim)", border: "1px solid var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#818cf8" }}>AI</div>
                 )}
@@ -279,11 +300,72 @@ export default function ChatInterface({ activeRepo, activeFile, onRepoChange, me
             {loading ? "…" : "▶"}
           </button>
         </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
-          <div style={{ display: "flex", gap: 16 }}>
-            {["⊕ Attach File", "ƒx Reference Function"].map(label => (
-              <button key={label} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: 12 }}>{label}</button>
-            ))}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, position: "relative" }}>
+          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+
+            {/* Chat navigator button — only shown when there are messages */}
+            {userMessages.length > 0 && (
+              <div ref={navRef} style={{ position: "relative" }}>
+                <button
+                  onClick={() => setNavOpen(o => !o)}
+                  title="Jump to message"
+                  style={{
+                    background: navOpen ? "var(--accent-dim)" : "none",
+                    border: navOpen ? "1px solid rgba(99,102,241,0.4)" : "1px solid transparent",
+                    borderRadius: 6, cursor: "pointer",
+                    color: navOpen ? "#818cf8" : "var(--text-muted)",
+                    fontSize: 12, padding: "3px 8px",
+                    display: "flex", alignItems: "center", gap: 5,
+                  }}
+                >
+                  {/* Hamburger lines */}
+                  <svg width="13" height="10" viewBox="0 0 13 10" fill="none">
+                    <rect y="0"  width="13" height="1.5" rx="1" fill="currentColor" />
+                    <rect y="4"  width="9"  height="1.5" rx="1" fill="currentColor" />
+                    <rect y="8"  width="11" height="1.5" rx="1" fill="currentColor" />
+                  </svg>
+                  <span>{userMessages.length}</span>
+                </button>
+
+                {/* Popup */}
+                {navOpen && (
+                  <div style={{
+                    position: "absolute", bottom: "calc(100% + 8px)", left: 0,
+                    width: 280, maxHeight: 320, overflowY: "auto",
+                    background: "var(--bg-card)", border: "1px solid var(--border)",
+                    borderRadius: 10, boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+                    zIndex: 50, padding: "6px",
+                  }}>
+                    <p style={{ margin: "4px 8px 6px", fontSize: 10, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                      Jump to
+                    </p>
+                    {userMessages.map((m, n) => (
+                      <button
+                        key={m.index}
+                        onClick={() => scrollToMessage(m.index)}
+                        style={{
+                          width: "100%", textAlign: "left", background: "none",
+                          border: "none", borderRadius: 7, cursor: "pointer",
+                          padding: "7px 10px", display: "flex", alignItems: "center", gap: 9,
+                        }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "none"; }}
+                      >
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, color: "#818cf8",
+                          background: "var(--accent-dim)", border: "1px solid rgba(99,102,241,0.3)",
+                          borderRadius: 4, padding: "1px 6px", flexShrink: 0,
+                        }}>Q{n + 1}</span>
+                        <span style={{
+                          fontSize: 12, color: "var(--text-secondary)",
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}>{m.content.slice(0, 60)}{m.content.length > 60 ? "…" : ""}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <span style={{ fontSize: 11, color: "var(--text-muted)" }}>⚡ llama3.2:3b</span>
         </div>

@@ -123,7 +123,7 @@ export default function RepoHome({ onRepoSelect }: RepoHomeProps) {
             value={url}
             onChange={e => setUrl(e.target.value)}
             onKeyDown={e => e.key === "Enter" && handleIndex()}
-            placeholder="Enter GitHub URL (e.g., https://github.com/owner/repo)"
+            placeholder="Enter GitHub URL"
             disabled={!!indexing}
             style={{
               flex: 1, background: "transparent", border: "none", outline: "none",

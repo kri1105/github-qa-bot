@@ -30,32 +30,38 @@ function persist(sessions: ChatSession[]) {
 export function useHistory() {
   const [history, setHistory] = useState<ChatSession[]>([]);
 
-  // Load + prune on mount
   useEffect(() => {
     const sessions = load();
-    persist(sessions); // write back pruned list
+    persist(sessions);
     setHistory(sessions);
   }, []);
 
-  /** Save the current messages as a completed session. No-op if messages is empty. */
-  const saveSession = useCallback((repoName: string | null, messages: Message[]) => {
+  /**
+   * Create or update a session by ID.
+   * - First call with a new ID: creates a new session at the top of the list.
+   * - Subsequent calls with the same ID: updates messages in place (no duplicate).
+   */
+  const upsertSession = useCallback((id: string, repoName: string | null, messages: Message[]) => {
     if (messages.length === 0) return;
-    const now     = Date.now();
-    const session: ChatSession = {
-      id:            crypto.randomUUID(),
-      repoName,
-      messages,
-      startedAt:     now,
-      lastMessageAt: now,
-    };
+    const now = Date.now();
     setHistory(prev => {
-      const updated = prune([session, ...prev]);
+      const existing = prev.find(s => s.id === id);
+      let updated: ChatSession[];
+      if (existing) {
+        // Update in place, keep original startedAt
+        updated = prev.map(s =>
+          s.id === id ? { ...s, messages, repoName, lastMessageAt: now } : s
+        );
+      } else {
+        // New session — prepend
+        const session: ChatSession = { id, repoName, messages, startedAt: now, lastMessageAt: now };
+        updated = prune([session, ...prev]);
+      }
       persist(updated);
       return updated;
     });
   }, []);
 
-  /** Delete a single session by id. */
   const deleteSession = useCallback((id: string) => {
     setHistory(prev => {
       const updated = prev.filter(s => s.id !== id);
@@ -64,11 +70,10 @@ export function useHistory() {
     });
   }, []);
 
-  /** Wipe all history. */
   const clearHistory = useCallback(() => {
     setHistory([]);
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
   }, []);
 
-  return { history, saveSession, deleteSession, clearHistory };
+  return { history, upsertSession, deleteSession, clearHistory };
 }
