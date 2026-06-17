@@ -1,3 +1,13 @@
+---
+title: GitHub QA Bot
+emoji: 🤖
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # 🤖 GitHub Repo Q&A Bot
 
 A local RAG (Retrieval-Augmented Generation) system that lets you ask natural language questions about any codebase. Built with ChromaDB + Ollama for fully offline inference, served by a FastAPI backend, and wrapped in a clean Next.js chat UI with source citations.
